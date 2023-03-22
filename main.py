@@ -1,8 +1,8 @@
 # importing the library
 import math
-
 import pygame
 import random
+from pygame import mixer
 
 # initialization
 pygame.init()
@@ -11,12 +11,25 @@ pygame.init()
 screen = pygame.display.set_mode((800, 600))
 
 # Set icon & Name
-pygame.display.set_caption("SPACE INVADERS")
+pygame.display.set_caption("Chicken Farm")
 icon = pygame.image.load("chicken.png")
 pygame.display.set_icon(icon)
 
 # Background image
 background = pygame.image.load("farmBG.png")
+
+# sound
+mixer.music.load('background.wav')
+mixer.music.play(-1)
+
+# score
+score_value = 0
+font = pygame.font.Font('freesansbold.ttf', 32)
+textX = 10
+textY = 10
+
+# gameover
+over_font = pygame.font.Font('freesansbold.ttf', 45)
 
 # player
 playerImg = pygame.image.load("player.png")
@@ -28,39 +41,59 @@ playerX_change = 0
 def player(x, y):
     screen.blit(playerImg, (x, y))
 
-# fox
-foxImg = pygame.image.load("fox.png")
-foxX = random.randint(0, 736)
-foxY = random.randint(50, 100)
-foxX_change = 1
-foxY_change = 2
 
-# balloon
-balloonImg = pygame.image.load('balloon.png')
-balloonX = 0
-balloonY = 480
-balloonX_change = 0
-balloonY_change = 5
-balloon_state = "ready"
+# Enemy
+enemyImg = []
+enemyX = []
+enemyY = []
+enemyX_change = []
+enemyY_change = []
+num_of_enemies = 5
+
+# loop
+for i in range(num_of_enemies):
+    enemyImg.append(pygame.image.load('fox.png'))
+    enemyX.append(random.randint(0, 736))
+    enemyY.append(random.randint(50, 100))
+    enemyX_change.append(4)
+    enemyY_change.append(40)
+
+# bullet
+bulletImg = pygame.image.load('balloon.png')
+bulletX = 0
+bulletY = 480
+bulletX_change = 0
+bulletY_change = 50
+bullet_state = "ready"
 
 
 def player(x, y):
     screen.blit(playerImg, (x, y))
 
 
-def fox(x, y):
-    screen.blit(foxImg, (x, y))
+def enemy(x, y, i):
+    screen.blit(enemyImg[i], (x, y))
 
 
-def fire_balloon(x, y):
-    global balloon_state
-    balloon_state = "fire"
-    screen.blit(balloonImg, (x + 16, y + 16))
+def fire_bullet(x, y):
+    global bullet_state
+    bullet_state = "fire"
+    screen.blit(bulletImg, (x + 16, y + 16))
+
+
+def show_score(x, y):
+    score = font.render("SCORE:" + str(score_value), True, (255, 255, 255))
+    screen.blit(score, (x, y))
+
+
+def game_over_text():
+    over_text = font.render('GAME OVER', True, (255, 0, 0))
+    screen.blit(over_text, (200, 250))
 
 
 # collision
-def iscollision(foxX, foxY, balloonX, balloonY):
-    distance = math.sqrt(math.pow(foxX - balloonX, 2) + math.pow(foxY - balloonY, 2))
+def iscollision(enemyX, enemyY, bulletX, bulletY):
+    distance = math.sqrt(math.pow(enemyX - bulletX, 2) + math.pow(enemyY - bulletY, 2))
     if distance < 25:
         return True
     else:
@@ -81,44 +114,62 @@ while running:
             if event.key == pygame.K_RIGHT:
                 playerX_change = 2
             if event.key == pygame.K_SPACE:
-                if balloon_state == "ready":
-                    balloonX = playerX
-                    fire_balloon(balloonX, balloonY)
+                if bullet_state == "ready":
+                    bulletSound = mixer.Sound("laser.wav")
+                    bulletSound.play()
+                    # Get the current x cordinate of the spaceship
+                    bulletX = playerX
+                    fire_bullet(bulletX, bulletY)
+
         if event.type == pygame.KEYUP:
-            if event.type == pygame.K_LEFT or event.key == pygame.K_RIGHT:
+            if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
                 playerX_change = 0
 
     playerX += playerX_change
+
+    # bullet movement
+    if bulletY <= 0:
+        bulletY = 480
+        bullet_state = "ready"
+    if bullet_state == "fire":
+        fire_bullet(bulletX, bulletY)
+        bulletY -= bulletY_change
 
     # setting boundaries for the player
     if playerX <= 0:
         playerX = 0
     if playerX >= 736:
         playerX = 736
-    foxX += foxX_change
-    if foxX <= 0:
-        foxX_change = 2
-        foxY += foxY_change
-    if foxX >= 736:
-        foxX_change = -2
-        foxY += foxY_change
 
-    # balloon movement
-    if balloonY <= 0:
-        balloonY = 480
-        balloon_state = "ready"
-    if balloon_state == "fire":
-        fire_balloon(balloonX, balloonY)
-        balloonY -= balloonY_change
+    # loop
+    for i in range(num_of_enemies):
+        # GAME OVER
+        if enemyY[i] > 440:
+            enemyY[i] = 1000
+            game_over_text()
+            break
+
+        enemyX[i] += enemyX_change[i]
+        if enemyX[i] <= 0:
+            enemyX_change[i] = 1
+            enemyY[i] += enemyY_change[i]
+        elif enemyX[i] >= 736:
+            enemyX_change[i] = -1
+            enemyY[i] += enemyY_change[i]
+
+        # collision impact
+        collision = iscollision(enemyX[i], enemyY[i], bulletX, bulletY)
+        if collision:
+            explosionSound = mixer.Sound("explosion.wav")
+            explosionSound.play()
+            bulletY = 400
+            bullet_state = "ready"
+            score_value += 1
+            print((score_value))
+            enemyX[i] = random.randint(0, 736)
+            enemyY[i] = random.randint(50, 150)
+        enemy(enemyX[i], enemyY[i], i)
 
     player(playerX, playerY)
-    fox(foxX, foxY)
+    show_score(textX, textY)
     pygame.display.update()
-
-# collision impact
-collision = iscollision(foxX, foxY, balloonX, balloonY)
-if collision:
-    balloonY = 400
-    balloon_state = "ready"
-    foxX = random.randint(0, 736)
-    foxY = random.randint(50, 150)
